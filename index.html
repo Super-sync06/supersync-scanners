@@ -36,6 +36,9 @@ button {
 
 <script>
 async function scan() {
+
+    console.log("SCAN STARTED");
+
     let result = document.getElementById("result");
     result.innerHTML = "<p>Scanning...</p>";
 
@@ -47,33 +50,55 @@ async function scan() {
     }
 
     let subnet = input.substring(0, input.lastIndexOf(".") + 1);
-
     const PREFIX = "02:D3:AF";
 
     for (let i = 1; i <= 254; i++) {
+
         let ip = subnet + i;
+        console.log("Checking:", ip);
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 400);
 
         try {
-            let response = await fetch("http://" + ip + "/statusjson");
+            let response = await fetch(`http://${ip}/statusjson`, {
+                signal: controller.signal,
+                mode: "cors"
+            });
+
+            clearTimeout(timeout);
+
+            console.log("Response from", ip, response);
+
             let text = await response.text();
+            console.log("Text:", text);
 
             let data = {};
-            try { data = JSON.parse(text); } catch(e) {}
+            try { data = JSON.parse(text); } catch(e) {
+                console.log("JSON parse error at", ip);
+            }
 
             if (data.mac && data.mac.toUpperCase().startsWith(PREFIX)) {
+                console.log("FOUND SUPERSYNC DEVICE at", ip);
                 result.innerHTML += `
                     <div class="device">
                         <b>SuperSync Speaker Found!</b><br>
                         IP: ${ip}<br>
                         MAC: ${data.mac}<br>
                         Model: ${data.model || "Unknown"}<br>
-                        <a href="http://${ip}" target="_blank">Open</a>
-                    </div>`;
+                        <a href="http://${ip}" target="_blank">Open Device</a>
+                    </div>
+                `;
             }
-        } catch (err) {}
+
+        } catch (err) {
+            console.log("Error querying", ip, err);
+            clearTimeout(timeout);
+        }
     }
 
     result.innerHTML += "<p>Scan complete.</p>";
+    console.log("SCAN FINISHED");
 }
 </script>
 
